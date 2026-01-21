@@ -6,27 +6,181 @@
 http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
-	<flow name="active-mqFlow" doc:id="c0f12266-d3e6-47de-9dfe-bb81d2597984" >
-		<http:listener doc:name="Listener" doc:id="fe75c500-2755-443c-8b1b-789d6f442dbc" config-ref="HTTP_Listener_config" path="/users"/>
-		<logger level="INFO" doc:name="Logger Payload" doc:id="eed36f9b-dfc0-4efc-8716-eb9612847f9d" message="#[payload]"/>
-		<ee:transform doc:name="Transform Message" doc:id="504b528e-09bb-40a8-8055-5fb3d4b7345b" >
-			<ee:message >
-				<ee:set-payload ><![CDATA[%dw 2.0
+	
+	<!-- HTTP Producer Flow - Publishes to Multiple Queues -->
+	<flow name="http-producer-flow" doc:id="c0f12266-d3e6-47de-9dfe-bb81d2597984" >
+		<http:listener doc:name="HTTP /users Listener" doc:id="fe75c500-2755-443c-8b1b-789d6f442dbc" config-ref="HTTP_Listener_config" path="/users"/>
+		
+		<!-- Input Validation and Logging -->
+		<logger level="INFO" doc:name="Log Request" doc:id="eed36f9b-dfc0-4efc-8716-eb9612847f9d" 
+			message="Received request: #[payload] | Headers: #[attributes.headers]"/>
+		
+		<!-- Data Transformation -->
+		<ee:transform doc:name="Prepare Message for Queues" doc:id="504b528e-09bb-40a8-8055-5fb3d4b7345b" >
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
-payload]]></ee:set-payload>
+{
+	data: payload,
+	timestamp: now(),
+	messageId: uuid(),
+	source: "http-api"
+}]]></ee:set-payload>
 			</ee:message>
+			<ee:variables>
+				<ee:set-variable variableName="messageId"><![CDATA[%dw 2.0
+output text/plain
+---
+uuid()]]></ee:set-variable>
+			</ee:variables>
 		</ee:transform>
-		<jms:publish doc:name="Publish" doc:id="734d22d6-3125-462d-9f0f-cd4d2577e557" destination="queue01" config-ref="JMS_Config_Global"/>
+		
+		<!-- Error Handling Scope -->
+		<try doc:name="Publish to Queues" doc:id="try-scope-publish">
+			<!-- Publish to Queue 01 -->
+			<jms:publish doc:name="Publish to Queue01" doc:id="734d22d6-3125-462d-9f0f-cd4d2577e557" 
+				destination="queue01" config-ref="JMS_Config_Global"
+				sendCorrelationId="ALWAYS">
+				<jms:message>
+					<jms:properties><![CDATA[#[{
+						"messageId": vars.messageId,
+						"priority": 5,
+						"source": "http-api"
+					}]]]></jms:properties>
+				</jms:message>
+			</jms:publish>
+			
+			<logger level="INFO" doc:name="Queue01 Published" doc:id="566ba86a-120b-4fe0-a411-19b66f60defa" 
+				message="Message published to queue01 - ID: #[vars.messageId]"/>
+			
+			<!-- Publish to Queue 02 -->
+			<jms:publish doc:name="Publish to Queue02" doc:id="e85bd525-5c68-4692-b09b-9db647104dd0" 
+				config-ref="JMS_Config_Global" destination="queue02"
+				sendCorrelationId="ALWAYS">
+				<jms:message>
+					<jms:properties><![CDATA[#[{
+						"messageId": vars.messageId,
+						"priority": 3,
+						"source": "http-api"
+					}]]]></jms:properties>
+				</jms:message>
+			</jms:publish>
+			
+			<logger level="INFO" doc:name="Queue02 Published" doc:id="63d0f670-e96f-4d4e-99e7-1e7f5d645401" 
+				message="Message published to queue02 - ID: #[vars.messageId]"/>
+			
+			<!-- Success Response -->
+			<ee:transform doc:name="Success Response" doc:id="success-response">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	status: "SUCCESS",
+	message: "Message published to both queues successfully",
+	messageId: vars.messageId,
+	timestamp: now()
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			
+			<error-handler>
+				<on-error-propagate enableNotifications="true" logException="true" doc:name="JMS Publish Error" type="JMS:*">
+					<logger level="ERROR" doc:name="Log Error" message="JMS Publish failed: #[error.description]"/>
+					<ee:transform doc:name="Error Response" doc:id="error-response">
+						<ee:message>
+							<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	status: "ERROR",
+	message: "Failed to publish message to queues",
+	error: error.description,
+	timestamp: now()
+}]]></ee:set-payload>
+						</ee:message>
+						<ee:variables>
+							<ee:set-variable variableName="httpStatus">500</ee:set-variable>
+						</ee:variables>
+					</ee:transform>
+				</on-error-propagate>
+			</error-handler>
+		</try>
 	</flow>
-	<flow name="queue01" doc:id="79adb9c5-4ce3-47ae-88fe-ec9c16d18890">
-		<jms:listener doc:name="On New Message" doc:id="880bc9ec-6614-4f7d-ba2a-15f84d13cd09" config-ref="JMS_Config_Global" destination="queue01" ackMode="AUTO" inboundContentType="application/json" />
-		<logger level="INFO" doc:name="Logger Payload" doc:id="07325b1a-0757-445e-b2f4-8b8a516741a4" message="#[payload]" />
-		<logger level="INFO" doc:name="Logger Payload1" doc:id="2dfce498-fb59-4ce7-8f86-54c4048ce94e" message="#[payload]" />
+	
+	<!-- Queue 01 Consumer Flow -->
+	<flow name="queue01-consumer-flow" doc:id="79adb9c5-4ce3-47ae-88fe-ec9c16d18890">
+		<jms:listener doc:name="Queue01 Listener" doc:id="880bc9ec-6614-4f7d-ba2a-15f84d13cd09" 
+			config-ref="JMS_Config_Global" destination="queue01" ackMode="AUTO" 
+			inboundContentType="application/json" numberOfConsumers="2"/>
+		
+		<logger level="INFO" doc:name="Processing Queue01 Message" doc:id="07325b1a-0757-445e-b2f4-8b8a516741a4" 
+			message="Processing Queue01 - MessageID: #[attributes.properties.messageId] | Payload: #[payload]"/>
+		
+		<!-- Business Logic for Queue01 -->
+		<try doc:name="Process Message" doc:id="try-process-q1">
+			<ee:transform doc:name="Process Business Logic" doc:id="process-q1-transform">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	processedBy: "queue01-consumer",
+	originalData: payload.data,
+	processedAt: now(),
+	messageId: payload.messageId default "unknown"
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			
+			<logger level="INFO" doc:name="Queue01 Processed Successfully" doc:id="q1-success-log" 
+				message="Queue01 processing completed - MessageID: #[payload.messageId]"/>
+			
+			<error-handler>
+				<on-error-propagate enableNotifications="true" logException="true" doc:name="Processing Error">
+					<logger level="ERROR" doc:name="Queue01 Processing Error" 
+						message="Error processing Queue01 message: #[error.description]"/>
+				</on-error-propagate>
+			</error-handler>
+		</try>
 	</flow>
-	<flow name="queue02" doc:id="3bcfbc5b-4aab-471d-ba23-943c6850f557" >
-		<jms:listener doc:name="On New Message" doc:id="37ca511b-41c0-4851-a3f4-c637aadb8cb8" config-ref="JMS_Config_Global" destination="queue02" ackMode="AUTO" inboundContentType="application/json"/>
-		<logger level="INFO" doc:name="Logger Payload" doc:id="849c5973-2eaf-44c3-81dd-a7a5c1a31932" message="#[payload]"/>
-		<logger level="INFO" doc:name="Logger Payload" doc:id="8086f13f-b6c1-4ee9-a2ee-dbc3f3729746" message="#[payload]" />
+	
+	<!-- Queue 02 Consumer Flow -->
+	<flow name="queue02-consumer-flow" doc:id="3bcfbc5b-4aab-471d-ba23-943c6850f557">
+		<jms:listener doc:name="Queue02 Listener" doc:id="37ca511b-41c0-4851-a3f4-c637aadb8cb8" 
+			config-ref="JMS_Config_Global" destination="queue02" ackMode="AUTO" 
+			inboundContentType="application/json" numberOfConsumers="1"/>
+		
+		<logger level="INFO" doc:name="Processing Queue02 Message" doc:id="849c5973-2eaf-44c3-81dd-a7a5c1a31932" 
+			message="Processing Queue02 - MessageID: #[attributes.properties.messageId] | Payload: #[payload]"/>
+		
+		<!-- Business Logic for Queue02 -->
+		<try doc:name="Process Message" doc:id="try-process-q2">
+			<ee:transform doc:name="Process Business Logic" doc:id="process-q2-transform">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	processedBy: "queue02-consumer",
+	originalData: payload.data,
+	processedAt: now(),
+	messageId: payload.messageId default "unknown",
+	priority: "low"
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+			
+			<logger level="INFO" doc:name="Queue02 Processed Successfully" doc:id="q2-success-log" 
+				message="Queue02 processing completed - MessageID: #[payload.messageId]"/>
+			
+			<error-handler>
+				<on-error-propagate enableNotifications="true" logException="true" doc:name="Processing Error">
+					<logger level="ERROR" doc:name="Queue02 Processing Error" 
+						message="Error processing Queue02 message: #[error.description]"/>
+				</on-error-propagate>
+			</error-handler>
+		</try>
 	</flow>
 </mule>

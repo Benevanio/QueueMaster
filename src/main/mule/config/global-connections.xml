@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+	<jms:config name="JMS_Config_Global" doc:name="JMS Config" doc:id="391f8623-3c05-4def-b7ac-c5ccd5c22608" sendCorrelationId="ALWAYS" >
+		<jms:active-mq-connection username="admin" password="admin" >
+			<jms:caching-strategy >
+				<jms:no-caching />
+			</jms:caching-strategy>
+			<jms:factory-configuration brokerUrl="tcp://0.0.0.0:61616" />
+		</jms:active-mq-connection>
+	</jms:config>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="aedc3d03-c35d-4702-a2ea-927c020a5573" >
+		<http:listener-connection host="0.0.0.0" port="3003" />
+	</http:listener-config>
+</mule>

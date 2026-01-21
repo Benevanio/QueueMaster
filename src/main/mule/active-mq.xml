@@ -1,5 +1,26 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd"></mule>
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="active-mqFlow" doc:id="c0f12266-d3e6-47de-9dfe-bb81d2597984" >
+		<http:listener doc:name="Listener" doc:id="fe75c500-2755-443c-8b1b-789d6f442dbc" config-ref="HTTP_Listener_config" path="/users"/>
+		<logger level="INFO" doc:name="Logger Payload" doc:id="eed36f9b-dfc0-4efc-8716-eb9612847f9d" message="#[payload]"/>
+		<ee:transform doc:name="Transform Message" doc:id="504b528e-09bb-40a8-8055-5fb3d4b7345b" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<jms:publish doc:name="Publish" doc:id="734d22d6-3125-462d-9f0f-cd4d2577e557" destination="queue01" config-ref="JMS_Config_Global"/>
+	</flow>
+	<flow name="active-mqFlow1" doc:id="3bcfbc5b-4aab-471d-ba23-943c6850f557" >
+		<jms:listener doc:name="On New Message" doc:id="37ca511b-41c0-4851-a3f4-c637aadb8cb8" config-ref="JMS_Config_Global" destination="queue01" ackMode="AUTO" inboundContentType="application/json"/>
+		<logger level="INFO" doc:name="Logger Payload" doc:id="849c5973-2eaf-44c3-81dd-a7a5c1a31932" message="#[payload]"/>
+	</flow>
+</mule>

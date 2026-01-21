@@ -19,8 +19,14 @@ payload]]></ee:set-payload>
 		</ee:transform>
 		<jms:publish doc:name="Publish" doc:id="734d22d6-3125-462d-9f0f-cd4d2577e557" destination="queue01" config-ref="JMS_Config_Global"/>
 	</flow>
-	<flow name="active-mqFlow1" doc:id="3bcfbc5b-4aab-471d-ba23-943c6850f557" >
-		<jms:listener doc:name="On New Message" doc:id="37ca511b-41c0-4851-a3f4-c637aadb8cb8" config-ref="JMS_Config_Global" destination="queue01" ackMode="AUTO" inboundContentType="application/json"/>
+	<flow name="queue01" doc:id="79adb9c5-4ce3-47ae-88fe-ec9c16d18890">
+		<jms:listener doc:name="On New Message" doc:id="880bc9ec-6614-4f7d-ba2a-15f84d13cd09" config-ref="JMS_Config_Global" destination="queue01" ackMode="AUTO" inboundContentType="application/json" />
+		<logger level="INFO" doc:name="Logger Payload" doc:id="07325b1a-0757-445e-b2f4-8b8a516741a4" message="#[payload]" />
+		<logger level="INFO" doc:name="Logger Payload1" doc:id="2dfce498-fb59-4ce7-8f86-54c4048ce94e" message="#[payload]" />
+	</flow>
+	<flow name="queue02" doc:id="3bcfbc5b-4aab-471d-ba23-943c6850f557" >
+		<jms:listener doc:name="On New Message" doc:id="37ca511b-41c0-4851-a3f4-c637aadb8cb8" config-ref="JMS_Config_Global" destination="queue02" ackMode="AUTO" inboundContentType="application/json"/>
 		<logger level="INFO" doc:name="Logger Payload" doc:id="849c5973-2eaf-44c3-81dd-a7a5c1a31932" message="#[payload]"/>
+		<logger level="INFO" doc:name="Logger Payload" doc:id="8086f13f-b6c1-4ee9-a2ee-dbc3f3729746" message="#[payload]" />
 	</flow>
 </mule>
